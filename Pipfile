@@ -9,6 +9,9 @@ autopep8 = "*"
 [packages]
 pandas = "*"
 numpy = "*"
+scipy = "*"
+networkx = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.6"
