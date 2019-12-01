@@ -88,48 +88,6 @@ def generate_tpg(ratings_matrix):
     return tpg
 
 
-def generate_tpg_alt(ratings_matrix):
-    tpg = {}
-    for user_id, user_ratings in enumerate(ratings_matrix):
-        print('\t> generating graph of user {0}'.format(user_id))
-        user_node = 'user_{0}'.format(user_id)
-        if user_node not in tpg:
-            tpg[user_node] = []
-
-        _, cols = user_ratings.nonzero()
-        for movie_id_1 in range(len(cols)):
-            movie_rating_1 = user_ratings[0, movie_id_1]
-            for movie_id_2 in range(movie_id_1 + 1, len(cols)):
-                movie_rating_2 = user_ratings[0, movie_id_2]
-
-                if movie_rating_1 > movie_rating_2:
-                    pair_node = 'pair_{0}>{1}'.format(movie_id_1, movie_id_2)
-                    item_d_node = 'item_{0}_d'.format(movie_id_1)
-                    item_u_node = 'item_{0}_u'.format(movie_id_2)
-                else:
-                    pair_node = 'pair_{0}>{1}'.format(movie_id_2, movie_id_1)
-                    item_d_node = 'item_{0}_d'.format(movie_id_2)
-                    item_u_node = 'item_{0}_u'.format(movie_id_1)
-
-                if item_d_node not in tpg:
-                    tpg[item_d_node] = []
-
-                if item_u_node not in tpg:
-                    tpg[item_u_node] = []
-
-                if pair_node not in tpg:
-                    tpg[pair_node] = []
-                    tpg[pair_node].append(item_d_node)
-                    tpg[pair_node].append(item_u_node)
-                    tpg[item_d_node].append(pair_node)
-                    tpg[item_u_node].append(pair_node)
-
-                tpg[user_node].append(pair_node)
-                tpg[pair_node].append(user_node)
-
-    return tpg
-
-
 def compute_pagerank(tpg, user_id):
     """
     this function computes the personalized pagerank of tgp with personalized vector which sets the target users element
