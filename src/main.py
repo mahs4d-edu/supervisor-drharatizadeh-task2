@@ -1,7 +1,7 @@
 import grank
 
 print('loading dataset ...')
-ratings_dataset = grank.load_dataset('movielens100k_ratings.csv')
+ratings_dataset = grank.load_dataset('test2.csv')
 total_users_count = ratings_dataset['userId'].max()
 total_movies_count = ratings_dataset['movieId'].max()
 
@@ -13,7 +13,7 @@ print('generating ratings matrix ...')
 ratings_matrix = grank.generate_ratings_matrix(ratings_dataset)
 
 print('generating tripartite preference graph ...')
-tpg = grank.generate_tpg(ratings_matrix)
+tpg = grank.generate_tpg(ratings_matrix, total_users_count, total_movies_count)
 
 # print('drawing ...')
 # grank.draw_tpg(tpg)
