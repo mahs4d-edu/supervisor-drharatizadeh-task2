@@ -3,6 +3,7 @@ from os import path
 import networkx as nx
 import pandas as pd
 from scipy import sparse
+import numpy as np
 import math
 from networkx import drawing as nx_drawing
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ def load_dataset(file_name):
 
     file_path = path.join(path.abspath(path.dirname(
         __file__)), '../data', file_name)
-    dataset = pd.read_csv(file_path, delim_whitespace=True)
+    dataset = pd.read_csv(file_path)  # , delim_whitespace=True if the old datasets were used
 
     # i multiply rating to two because i can work better with int than float
     dataset['rating'] = dataset['rating'] * 2
@@ -30,11 +31,11 @@ def save_small_dataset(ratings_dataset, size, filename):
     a.to_csv(filename, index=False)
 
 
-def generate_training_test_datasets(ratings_dataset, t, total_users_count):
+def generate_training_test_datasets(ratings_dataset, t, user_ids):
     """
     selects t ratings for each user and puts it in training dataset and others into the test dataset. users that have
     less than t+10 ratings, will be removed
-    :param total_users_count:
+    :param user_ids:
     :param ratings_dataset:
     :param t:
     :return: a tuple of (training_dataset, test_dataset)
@@ -42,7 +43,7 @@ def generate_training_test_datasets(ratings_dataset, t, total_users_count):
 
     training_dataset = []
     test_dataset = []
-    for user_id in range(1, total_users_count + 1):
+    for user_id in user_ids:
         user_ratings = ratings_dataset[ratings_dataset['userId'] == user_id]
 
         if len(user_ratings) < t + 10:
@@ -91,34 +92,32 @@ def generate_ratings_matrix(ratings_dataset):
         else:
             ratings_matrix[user_id] = [(movie_id, rating)]
 
-    # row = ratings_dataset['userId']
-    # column = ratings_dataset['movieId']
-    # data = ratings_dataset['rating']
-    #
-    # ratings_matrix = sparse.csr_matrix((data, (row, column)))
     return ratings_matrix
 
 
-def generate_tpg(ratings_matrix, total_user_counts, total_movies_counts):
+def generate_tpg(ratings_matrix, user_ids, movie_ids):
     """
     generates the tripartite preference graph according to the grank algorithm from rating matrix
-    :param total_movies_counts:
-    :param total_user_counts:
+    :param movie_ids:
+    :param user_ids:
     :param ratings_matrix:
     :return: a networkx graph
     """
 
     tpg = nx.Graph()
 
-    for i in range(1, total_user_counts + 1):
-        print('\t> creating user node {0}'.format(i))
-        user_node = 'user_{0}'.format(i)
+    # for each user, create a node
+    for user_id in user_ids:
+        print('\t> creating user node {0}'.format(user_id))
+        user_node = 'user_{0}'.format(user_id)
         if not tpg.has_node(user_node):
             tpg.add_node(user_node)
 
-    for i in range(1, total_movies_counts + 1):
-        item_d_node = 'item_{0}_d'.format(i)
-        item_u_node = 'item_{0}_u'.format(i)
+    # create desirable and undesirable nodes foreach movie
+    for movie_id in movie_ids:
+        print('\t> creating movie nodes for movie {0}'.format(movie_id))
+        item_d_node = 'item_{0}_d'.format(movie_id)
+        item_u_node = 'item_{0}_u'.format(movie_id)
 
         if not tpg.has_node(item_d_node):
             tpg.add_node(item_d_node)
@@ -126,16 +125,19 @@ def generate_tpg(ratings_matrix, total_user_counts, total_movies_counts):
         if not tpg.has_node(item_u_node):
             tpg.add_node(item_u_node)
 
-    for i in range(1, total_movies_counts + 1):
-        item_d_i_node = 'item_{0}_d'.format(i)
-        item_u_i_node = 'item_{0}_u'.format(i)
+    # create A > B pairs for each possible tuple of movies
+    for i in range(0, len(movie_ids)):
+        movie_id_1 = movie_ids[i]
+        item_d_i_node = 'item_{0}_d'.format(movie_id_1)
+        item_u_i_node = 'item_{0}_u'.format(movie_id_1)
 
-        for j in range(i + 1, total_movies_counts + 1):
-            item_d_j_node = 'item_{0}_d'.format(j)
-            item_u_j_node = 'item_{0}_u'.format(j)
+        for j in range(i + 1, len(movie_ids)):
+            movie_id_2 = movie_ids[j]
+            item_d_j_node = 'item_{0}_d'.format(movie_id_2)
+            item_u_j_node = 'item_{0}_u'.format(movie_id_2)
 
-            pair_1_node = 'pair_{0}>{1}'.format(i, j)
-            pair_2_node = 'pair_{0}>{1}'.format(j, i)
+            pair_1_node = 'pair_{0}>{1}'.format(movie_id_1, movie_id_2)
+            pair_2_node = 'pair_{0}>{1}'.format(movie_id_2, movie_id_1)
 
             if not tpg.has_node(pair_1_node):
                 tpg.add_node(pair_1_node)
@@ -152,10 +154,7 @@ def generate_tpg(ratings_matrix, total_user_counts, total_movies_counts):
             continue
 
         print('\t> generating graph of user {0}'.format(user_id))
-        # for each user, create a node
         user_node = 'user_{0}'.format(user_id)
-        if not tpg.has_node(user_node):
-            tpg.add_node(user_node)
 
         # get all the movies that specific user has rated and create a node for each pair of them based on a constraint
         # that which movie he rated has a higher rate than the other. we also connect the pair nodes to their respective
@@ -168,6 +167,7 @@ def generate_tpg(ratings_matrix, total_user_counts, total_movies_counts):
             for j in range(i + 1, len(user_ratings)):
                 movie_id_2 = user_ratings[j][0]
                 movie_rating_2 = user_ratings[j][1]
+
                 if movie_rating_1 > movie_rating_2:
                     pair_node = 'pair_{0}>{1}'.format(movie_id_1, movie_id_2)
                 elif movie_rating_2 > movie_rating_1:
@@ -178,6 +178,107 @@ def generate_tpg(ratings_matrix, total_user_counts, total_movies_counts):
                 # finally connect the user node to the pair node
                 tpg.add_edge(user_node, pair_node)
 
+    return tpg
+
+
+def get_user_index(user_id):
+    return user_id - 1
+
+
+def get_item_d_index(stats, movie_id):
+    u, i = stats
+    return u + movie_id - 1
+
+
+def get_item_u_index(stats, movie_id):
+    u, i = stats
+    return u + i + movie_id - 1
+
+
+def get_pair_index(stats, movie_id_1, movie_id_2):
+    u, i = stats
+    if movie_id_1 > movie_id_2:
+        return u + (2 * i) + ((movie_id_1 - 1) * (i - 1)) + movie_id_2 - 1
+    elif movie_id_2 > movie_id_1:
+        return u + (2 * i) + ((movie_id_1 - 1) * (i - 1)) + movie_id_2 - 2
+    else:
+        raise ValueError('invalid pair')
+
+
+def add_edge(rows, columns, data, n1, n2):
+    rows.extend([n1, n2])
+    columns.extend([n2, n1])
+    data.extend([1, 1])
+
+
+def generate_tpg_alt(ratings_matrix, user_ids, movie_ids):
+    """
+    generates the tripartite preference graph according to the grank algorithm from rating matrix
+    :param movie_ids:
+    :param user_ids:
+    :param ratings_matrix:
+    :return: a networkx graph
+    """
+    stats = (len(user_ids), len(movie_ids))
+    m_size = stats[0] + stats[1] + stats[1] + ((stats[1] * (stats[1] - 1)) / 2) + 1
+    rows = []
+    columns = []
+    data = []
+
+    # create A > B pairs for each possible tuple of movies
+    for i in range(0, len(movie_ids)):
+        movie_id_1 = movie_ids[i]
+        item_d_i_index = get_item_d_index(stats, movie_id_1)
+        item_u_i_index = get_item_u_index(stats, movie_id_1)
+
+        for j in range(i + 1, len(movie_ids)):
+            movie_id_2 = movie_ids[j]
+            item_d_j_index = get_item_d_index(stats, movie_id_2)
+            item_u_j_index = get_item_u_index(stats, movie_id_2)
+
+            pair_1_index = get_pair_index(stats, movie_id_1, movie_id_2)
+            pair_2_index = get_pair_index(stats, movie_id_2, movie_id_1)
+
+            add_edge(rows, columns, data, pair_1_index, item_d_i_index)
+            add_edge(rows, columns, data, pair_1_index, item_u_j_index)
+
+            add_edge(rows, columns, data, pair_2_index, item_d_j_index)
+            add_edge(rows, columns, data, pair_2_index, item_u_i_index)
+
+    for user_id in ratings_matrix:
+        user_ratings = ratings_matrix[user_id]
+
+        if user_id == 0:
+            continue
+
+        print('\t> generating graph of user {0}'.format(user_id))
+        user_node = get_user_index(user_id)
+
+        # get all the movies that specific user has rated and create a node for each pair of them based on a constraint
+        # that which movie he rated has a higher rate than the other. we also connect the pair nodes to their respective
+        # nodes in the items section of the graph (for example "A > B" will be connected to "A_Desirable" and
+        # "B_UnDesirable" respectively
+
+        for i in range(len(user_ratings)):
+            movie_id_1 = user_ratings[i][0]
+            movie_rating_1 = user_ratings[i][1]
+            for j in range(i + 1, len(user_ratings)):
+                movie_id_2 = user_ratings[j][0]
+                movie_rating_2 = user_ratings[j][1]
+
+                if movie_rating_1 > movie_rating_2:
+                    pair_node = get_pair_index(stats, movie_id_1, movie_id_2)
+                elif movie_rating_2 > movie_rating_1:
+                    pair_node = get_pair_index(stats, movie_id_2, movie_id_1)
+                else:
+                    continue
+
+                # finally connect the user node to the pair node
+
+                add_edge(rows, columns, data, user_node, pair_node)
+
+    print(rows)
+    tpg = sparse.csr_matrix((data, (rows, columns)), shape=(int(m_size), int(m_size)), dtype=np.int8)
     return tpg
 
 
@@ -202,6 +303,23 @@ def compute_pagerank(tpg, user_id):
     return matrix
 
 
+def compute_pagerank_alt(tpg, user_id):
+    """
+    this function computes the personalized pagerank of tgp with personalized vector which sets the target users element
+    one and all other nodes as zero (this version uses sparse matrix representation of tpg)
+    :param tpg:
+    :param user_id:
+    :return: pagerank matrix as a dictionary
+    """
+    personalization_matrix = {'user_{0}'.format(user_id): 1}
+
+    # the matrix is generated using networkx library
+    print(tpg.shape)
+    matrix = nx.pagerank_scipy(tpg, alpha=0.85, personalization=personalization_matrix)
+
+    return matrix
+
+
 def _compute_grank(pagerank, movie_id):
     """
     computes grank of single movie from the pagerank matrix using GRank=PPR_desirable/(PPR_desirable + PPR_undesirable)
@@ -220,17 +338,17 @@ def _compute_grank(pagerank, movie_id):
     return ppr_d / (ppr_d + ppr_u)
 
 
-def get_top_k_recommendations(pagerank, total_movies_count, k):
+def get_top_k_recommendations(pagerank, movie_ids, k):
     """
     computes grank for each movie and sorts them. returns the top k items of the sorted list
     :param pagerank:
-    :param total_movies_count:
+    :param movie_ids:
     :param k:
     :return: a list of tuples containing grank and movie id
     """
 
     movie_granks = []
-    for movie_id in range(1, total_movies_count + 1):
+    for movie_id in movie_ids:
         grank = _compute_grank(pagerank, movie_id)
         movie_granks.append((grank, movie_id))
 
@@ -261,7 +379,7 @@ def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix):
     sum = 0
     alpha_sum = 0
     max_rate = _get_user_max_rating(ratings_matrix, user_id)
-    print(max_rate)
+
     for i, recommendation in enumerate(top_k_recommendations):
         rate = _get_user_rating(ratings_matrix, user_id, recommendation[1])
         sum += (2 ** rate) / math.log(i + 2, 2)
@@ -270,16 +388,14 @@ def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix):
     return (1 / alpha_sum) * sum
 
 
-def compute_accuracy(tpg, ratings_matrix, test_dataset, total_movies_count, k):
+def compute_accuracy(tpg, ratings_matrix, user_ids, movie_ids, k):
     """
     computes average NDCG@k for all the users in test_dataset
     :param test_dataset:
-    :param total_movies_count:
+    :param movie_ids:
     :param k:
     :return: average NDCG@k
     """
-
-    user_ids = test_dataset['userId'].unique().tolist()
 
     ndcg_sum = 0
     for user_id in user_ids:
@@ -289,8 +405,8 @@ def compute_accuracy(tpg, ratings_matrix, test_dataset, total_movies_count, k):
         pagerank = compute_pagerank(tpg, user_id)
 
         # compute top k recommendation
-        top_k_recommendations = get_top_k_recommendations(pagerank, total_movies_count, k)
-        print(top_k_recommendations)
+        top_k_recommendations = get_top_k_recommendations(pagerank, movie_ids, k)
+
         # get ndcg@k of the recommendations
         ndcg = _compute_ndcg(user_id, top_k_recommendations, ratings_matrix)
 
