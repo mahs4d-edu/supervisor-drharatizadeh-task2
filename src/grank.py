@@ -149,7 +149,7 @@ def generate_tpg_alt(stats, ratings_matrix, user_ids, movie_ids):
             my_graph.add_edge(pair_2_index, item_d_j_index)
             my_graph.add_edge(pair_2_index, item_u_i_index)
 
-    for user_id in ratings_matrix:
+    for user_id in user_ids:
         user_ratings = ratings_matrix[user_id]
 
         if user_id == 0:
@@ -275,7 +275,7 @@ def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k):
 
         # compute top k recommendation
         top_k_recommendations = get_top_k_recommendations(stats, pagerank, movie_ids, k)
-        print(top_k_recommendations)
+
         # get ndcg@k of the recommendations
         ndcg = _compute_ndcg(user_id, top_k_recommendations, ratings_matrix)
 

@@ -3,7 +3,7 @@ import grank
 # region loading dataset and training/test
 
 print('loading dataset ...')
-ratings_dataset = grank.load_dataset('movielens100k_ratings.csv')
+ratings_dataset = grank.load_dataset('movielens10k_ratings.csv')
 
 user_ids = ratings_dataset['userId'].unique().tolist()
 
@@ -12,8 +12,8 @@ t = int(input('Please Provide T: '))
 training_dataset, test_dataset = grank.generate_training_test_datasets(ratings_dataset, t, user_ids)
 
 # getting user and movies list
-user_ids = ratings_dataset['userId'].unique().tolist()  # f
-movie_ids = ratings_dataset['movieId'].unique().tolist()  # f
+user_ids = training_dataset['userId'].unique().tolist()  # f
+movie_ids = training_dataset['movieId'].unique().tolist()  # f
 
 total_users_count = len(user_ids)
 print('{0} users'.format(total_users_count))
@@ -25,14 +25,13 @@ stats = (max(user_ids), max(movie_ids))
 # endregion
 
 print('generating ratings matrix ...')
-training_matrix = grank.generate_ratings_matrix(ratings_dataset)  # f
+training_matrix = grank.generate_ratings_matrix(training_dataset)  # f
 ratings_matrix = grank.generate_ratings_matrix(ratings_dataset)
 
 del ratings_dataset
 
 print('generating tripartite preference graph ...')
-tpg = grank.generate_tpg_alt(stats, ratings_matrix, user_ids, movie_ids)  # f
-print(tpg)
+tpg = grank.generate_tpg_alt(stats, training_matrix, user_ids, movie_ids)  # f
 
 print('computing accuracy ...')
 k_list = [5, 7, 9]
