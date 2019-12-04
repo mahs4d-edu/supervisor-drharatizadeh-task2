@@ -116,12 +116,6 @@ def get_pair_index(stats, movie_id_1, movie_id_2):
         raise ValueError('invalid pair')
 
 
-def add_edge(rows, columns, data, n1, n2):
-    rows.extend([n1, n2])
-    columns.extend([n2, n1])
-    data.extend([1, 1])
-
-
 def generate_tpg_alt(stats, ratings_matrix, user_ids, movie_ids):
     """
     generates the tripartite preference graph according to the grank algorithm from rating matrix
