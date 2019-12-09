@@ -237,36 +237,66 @@ def _get_user_rating(ratings_matrix, user_id, movie_id):
     return 0
 
 
-def _get_user_max_rating(ratings_matrix, user_id):
-    max_rate = 0
-    user_ratings = ratings_matrix[user_id]
-    for t in user_ratings:
-        if t[1] > max_rate:
-            max_rate = t[1]
+def _get_user_max_ratings(ratings_matrix, user_id, max_k):
+    user_ratings = sorted(ratings_matrix[user_id], key=lambda x: x[1], reverse=True)
 
-    return max_rate
+    max_ratings = []
+    for i in range(max_k):
+        max_ratings.append(user_ratings[i][1])
+
+    return max_ratings
 
 
-def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix):
-    summation = 0
-    alpha_sum = 0
-    max_rate = _get_user_max_rating(ratings_matrix, user_id)
+def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list):
+    max_k = 1
+    ndcg_dict = {}
+
+    for k in k_list:
+        if k > max_k:
+            max_k = k
+        ndcg_dict[str(k) + 'sum'] = 0
+        ndcg_dict[str(k) + 'alpha'] = 0
+
+    max_rate = _get_user_max_ratings(ratings_matrix, user_id, max_k)
 
     for i, recommendation in enumerate(top_k_recommendations):
+        if i >= max_k:
+            break
+
         rate = _get_user_rating(ratings_matrix, user_id, recommendation[1])
-        summation += (2 ** rate) / math.log(i + 2, 2)
-        alpha_sum += (2 ** max_rate) / math.log(i + 2, 2)
+        for k in k_list:
+            if i < k:
+                try:
+                    b = max_rate[i]
+                except IndexError:
+                    b = 0
 
-    return (1 / alpha_sum) * summation
+                ndcg_dict[str(k) + 'sum'] += (2 ** rate) / math.log(i + 2, 2)
+                ndcg_dict[str(k) + 'alpha'] += (2 ** b) / math.log(i + 2, 2)
+
+    results = {}
+    for k in k_list:
+        results[k] = (1 / ndcg_dict[str(k) + 'alpha']) * ndcg_dict[str(k) + 'sum']
+
+    return results
 
 
-def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k):
+def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k_list):
     """
     computes average NDCG@k for all the users in test_dataset
     :return: average NDCG@k
     """
 
-    ndcg_sum = 0
+    ndcg_sum = {}
+
+    max_k = 1
+
+    for k in k_list:
+        if k > max_k:
+            max_k = k
+
+        ndcg_sum[k] = 0
+
     for user_id in user_ids:
         print('\t>computing accuracy for user {0}'.format(user_id))
 
@@ -274,12 +304,17 @@ def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k):
         pagerank = compute_pagerank_alt(tpg, user_id)
 
         # compute top k recommendation
-        top_k_recommendations = get_top_k_recommendations(stats, pagerank, movie_ids, k)
+        top_k_recommendations = get_top_k_recommendations(stats, pagerank, movie_ids, max_k)
 
         # get ndcg@k of the recommendations
-        ndcg = _compute_ndcg(user_id, top_k_recommendations, ratings_matrix)
+        ndcg = _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list)
 
         print('\t>ndcg of user {0} is {1}'.format(user_id, ndcg))
-        ndcg_sum += ndcg
+        for k in k_list:
+            ndcg_sum[k] += ndcg[k]
 
-    return ndcg_sum / len(user_ids)
+    users_len = len(user_ids)
+    for k in k_list:
+        ndcg_sum[k] = ndcg_sum[k] / users_len
+
+    return ndcg_sum

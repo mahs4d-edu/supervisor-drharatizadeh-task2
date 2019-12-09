@@ -3,7 +3,7 @@ import grank
 # region loading dataset and training/test
 
 print('loading dataset ...')
-ratings_dataset = grank.load_dataset('movielens10k_ratings.csv')
+ratings_dataset = grank.load_dataset('movielens1k_ratings.csv')
 
 user_ids = ratings_dataset['userId'].unique().tolist()
 
@@ -34,8 +34,9 @@ print('generating tripartite preference graph ...')
 tpg = grank.generate_tpg_alt(stats, training_matrix, user_ids, movie_ids)  # f
 
 print('computing accuracy ...')
-k_list = [5, 7, 9]
-for k in k_list:
-    print('computing NDCG@{0} ...'.format(k))
-    accuracy_k = grank.compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k)
-    print('accuracy using ndcg@{0} is {1}'.format(k, accuracy_k))
+k_list = [3, 5, 7, 9]
+
+accuracy = grank.compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k_list)
+
+for k in accuracy.keys():
+    print('NDCG@{0}: {1}'.format(k, accuracy[k]))
