@@ -1,7 +1,8 @@
 import grank
 import datetime
 
-print('Start Time: {0}: '.format(datetime.datetime.now()))
+start_time = datetime.datetime.now()
+print('Start Time: {0}: '.format(start_time))
 
 # region loading dataset and training/test
 print('loading dataset ...')
@@ -51,4 +52,7 @@ for k in accuracy.keys():
 
 # endregion
 
-print('End Time: {0}: '.format(datetime.datetime.now()))
+end_time = datetime.datetime.now()
+print('End Time: {0}: '.format(end_time))
+
+print('Time to Complete: {0}'.format(str(end_time - start_time)))
