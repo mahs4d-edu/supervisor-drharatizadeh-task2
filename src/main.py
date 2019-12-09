@@ -1,9 +1,11 @@
 import grank
+import datetime
+
+print('Start Time: {0}: '.format(datetime.datetime.now()))
 
 # region loading dataset and training/test
-
 print('loading dataset ...')
-ratings_dataset = grank.load_dataset('movielens1k_ratings.csv')
+ratings_dataset = grank.load_dataset('movielens20k_ratings.csv')
 
 user_ids = ratings_dataset['userId'].unique().tolist()
 
@@ -24,6 +26,8 @@ stats = (max(user_ids), max(movie_ids))
 
 # endregion
 
+# region graph generation
+
 print('generating ratings matrix ...')
 training_matrix = grank.generate_ratings_matrix(training_dataset)  # f
 ratings_matrix = grank.generate_ratings_matrix(ratings_dataset)
@@ -33,6 +37,10 @@ del ratings_dataset
 print('generating tripartite preference graph ...')
 tpg = grank.generate_tpg_alt(stats, training_matrix, user_ids, movie_ids)  # f
 
+# endregion
+
+# region accuracy
+
 print('computing accuracy ...')
 k_list = [3, 5, 7, 9]
 
@@ -40,3 +48,7 @@ accuracy = grank.compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_id
 
 for k in accuracy.keys():
     print('NDCG@{0}: {1}'.format(k, accuracy[k]))
+
+# endregion
+
+print('End Time: {0}: '.format(datetime.datetime.now()))
