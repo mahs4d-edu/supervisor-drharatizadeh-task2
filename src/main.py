@@ -6,13 +6,14 @@ print('Start Time: {0}: '.format(start_time))
 
 # region loading dataset and training/test
 print('loading dataset ...')
-ratings_dataset = grank.load_dataset('movielens20k_ratings.csv')
+ratings_dataset = grank.load_dataset('movielens100k_ratings.csv')
 
 user_ids = ratings_dataset['userId'].unique().tolist()
 
 print('generating training and test datasets ...')
 t = int(input('Please Provide T: '))
 training_dataset, test_dataset = grank.generate_training_test_datasets(ratings_dataset, t, user_ids)
+del test_dataset
 
 # getting user and movies list
 user_ids = training_dataset['userId'].unique().tolist()  # f
