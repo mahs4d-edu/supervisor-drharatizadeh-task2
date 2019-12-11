@@ -19,7 +19,7 @@ def load_dataset(file_name):
     dataset = pd.read_csv(file_path)  # , delim_whitespace=True if the old datasets were used
 
     # i multiply rating to two because i can work better with int than float
-    dataset['rating'] = dataset['rating'] * 2
+    dataset['rating'] = dataset['rating'] / 2
     return dataset
 
 
@@ -56,14 +56,14 @@ def generate_training_test_datasets(ratings_dataset, t, user_ids):
     training_dataset = training_dataset.astype(dtype={
         'userId': int,
         'movieId': int,
-        'rating': int,
+        'rating': float,
         'timestamp': int,
     })
     test_dataset = pd.DataFrame(test_dataset, columns=['userId', 'movieId', 'rating', 'timestamp'])
     test_dataset = test_dataset.astype(dtype={
         'userId': int,
         'movieId': int,
-        'rating': int,
+        'rating': float,
         'timestamp': int,
     })
 
@@ -213,7 +213,7 @@ def _compute_grank(stats, pagerank: MahdiMatrix, movie_id):
     return ppr_d / (ppr_d + ppr_u)
 
 
-def get_top_k_recommendations(stats, pagerank, movie_ids, k):
+def get_top_k_recommendations(training_matrix, test_matrix, user_id, stats, pagerank, movie_ids, k):
     """
     computes grank for each movie and sorts them. returns the top k items of the sorted list
     :return: a list of tuples containing grank and movie id
@@ -221,6 +221,9 @@ def get_top_k_recommendations(stats, pagerank, movie_ids, k):
 
     movie_granks = []
     for movie_id in movie_ids:
+        if _get_user_rating(test_matrix, user_id, movie_id) == 0:
+            continue
+
         grank = _compute_grank(stats, pagerank, movie_id)
         movie_granks.append((grank, movie_id))
 
@@ -247,7 +250,7 @@ def _get_user_max_ratings(ratings_matrix, user_id, max_k):
     return max_ratings
 
 
-def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list):
+def _compute_ndcg(user_id, top_k_recommendations, test_matrix, k_list):
     max_k = 1
     ndcg_dict = {}
 
@@ -257,13 +260,13 @@ def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list):
         ndcg_dict[str(k) + 'sum'] = 0
         ndcg_dict[str(k) + 'alpha'] = 0
 
-    max_rate = _get_user_max_ratings(ratings_matrix, user_id, max_k)
+    max_rate = _get_user_max_ratings(test_matrix, user_id, max_k)
 
     for i, recommendation in enumerate(top_k_recommendations):
         if i >= max_k:
             break
 
-        rate = _get_user_rating(ratings_matrix, user_id, recommendation[1])
+        rate = _get_user_rating(test_matrix, user_id, recommendation[1])
         for k in k_list:
             if i < k:
                 try:
@@ -281,7 +284,7 @@ def _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list):
     return results
 
 
-def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k_list):
+def compute_accuracy(stats, tpg, training_matrix, test_matrix, user_ids, movie_ids, k_list):
     """
     computes average NDCG@k for all the users in test_dataset
     :return: average NDCG@k
@@ -297,23 +300,35 @@ def compute_accuracy(stats, tpg, ratings_matrix, user_ids, movie_ids, k_list):
 
         ndcg_sum[k] = 0
 
+    users_len = 0
     for user_id in user_ids:
+        # if user_id > 20:
+        #     continue
+
+        users_len += 1
         print('\t>computing accuracy for user {0}'.format(user_id))
 
         # first we compute pagerank for this user
         pagerank = compute_pagerank_alt(tpg, user_id)
 
         # compute top k recommendation
-        top_k_recommendations = get_top_k_recommendations(stats, pagerank, movie_ids, max_k)
+        top_k_recommendations = get_top_k_recommendations(training_matrix, test_matrix, user_id, stats, pagerank,
+                                                          movie_ids, max_k)
+        # print(top_k_recommendations)
+
+        recom_rates = []
+        for recom in top_k_recommendations:
+            recom_rates.append((recom[0], recom[1], _get_user_rating(test_matrix, user_id, recom[1])))
+        print('recommended items rates: {0}'.format(recom_rates))
+        print('ideal rates: {0}'.format(_get_user_max_ratings(test_matrix, user_id, max_k)))
 
         # get ndcg@k of the recommendations
-        ndcg = _compute_ndcg(user_id, top_k_recommendations, ratings_matrix, k_list)
+        ndcg = _compute_ndcg(user_id, top_k_recommendations, test_matrix, k_list)
 
         print('\t>ndcg of user {0} is {1}'.format(user_id, ndcg))
         for k in k_list:
             ndcg_sum[k] += ndcg[k]
 
-    users_len = len(user_ids)
     for k in k_list:
         ndcg_sum[k] = ndcg_sum[k] / users_len
 
